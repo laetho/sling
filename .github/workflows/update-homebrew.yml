@@ -1,0 +1,119 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (e.g. v0.8.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update formula
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          export VERSION="${TAG#v}"
+          ASSETS=(
+            "sling_darwin_arm64.tar.gz"
+            "sling_darwin_amd64.tar.gz"
+            "sling_linux_arm64.tar.gz"
+            "sling_linux_amd64.tar.gz"
+          )
+          mkdir -p dist
+          for asset in "${ASSETS[@]}"; do
+            url="https://github.com/laetho/sling/releases/download/${TAG}/${asset}"
+            curl -fL "$url" -o "dist/${asset}"
+          done
+          declare -A SHAS
+          for asset in "${ASSETS[@]}"; do
+            sha=$(sha256sum "dist/${asset}" | awk '{print $1}')
+            SHAS["$asset"]="$sha"
+          done
+          export SHA_DARWIN_ARM64="${SHAS[sling_darwin_arm64.tar.gz]}"
+          export SHA_DARWIN_AMD64="${SHAS[sling_darwin_amd64.tar.gz]}"
+          export SHA_LINUX_ARM64="${SHAS[sling_linux_arm64.tar.gz]}"
+          export SHA_LINUX_AMD64="${SHAS[sling_linux_amd64.tar.gz]}"
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          tag = os.environ["TAG"]
+          version = os.environ["VERSION"]
+          mapping = {
+              "sling_darwin_arm64.tar.gz": os.environ["SHA_DARWIN_ARM64"],
+              "sling_darwin_amd64.tar.gz": os.environ["SHA_DARWIN_AMD64"],
+              "sling_linux_arm64.tar.gz": os.environ["SHA_LINUX_ARM64"],
+              "sling_linux_amd64.tar.gz": os.environ["SHA_LINUX_AMD64"],
+          }
+
+          path = Path("Formula/sling.rb")
+          text = path.read_text()
+          text = re.sub(r'^\s*version "[^"]+"$', f'  version "{version}"', text, flags=re.M)
+
+          lines = text.splitlines()
+          current_asset = None
+          used_assets = set()
+
+          for i, line in enumerate(lines):
+            url_match = re.match(
+                r'^(\s+)url "https://github.com/laetho/sling/releases/download/[^/]+/(sling_[^"]+)"',
+                line,
+            )
+            if url_match:
+              indent, asset = url_match.groups()
+              if asset in mapping:
+                lines[i] = f'{indent}url "https://github.com/laetho/sling/releases/download/{tag}/{asset}"'
+                current_asset = asset
+              continue
+
+            sha_match = re.match(r'^(\s+)sha256 "[0-9a-f]+"', line)
+            if sha_match and current_asset in mapping:
+              indent = sha_match.group(1)
+              lines[i] = f'{indent}sha256 "{mapping[current_asset]}"'
+              used_assets.add(current_asset)
+              current_asset = None
+
+          missing = set(mapping.keys()) - used_assets
+          if missing:
+            raise SystemExit(f"Missing sha updates for: {', '.join(sorted(missing))}")
+
+          path.write_text("\n".join(lines) + ("\n" if text.endswith("\n") else ""))
+          PY
+
+      - name: Commit and push
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          if git diff --quiet; then
+            echo "No formula changes to commit."
+            exit 0
+          fi
+          git add Formula/sling.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update Homebrew formula for ${TAG}"
+          git push origin master
