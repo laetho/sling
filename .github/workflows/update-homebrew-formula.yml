@@ -1,0 +1,79 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git author
+        run: git config user.name "github-actions[bot]" && git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update formula for release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="v${VERSION}"
+          BASE_URL="https://github.com/laetho/sling/releases/download/${TAG}"
+
+          SHA_DARWIN_AMD64=$(curl -sL "${BASE_URL}/sling_darwin_amd64.tar.gz" | sha256sum | awk '{print $1}')
+          SHA_DARWIN_ARM64=$(curl -sL "${BASE_URL}/sling_darwin_arm64.tar.gz" | sha256sum | awk '{print $1}')
+          SHA_LINUX_AMD64=$(curl -sL "${BASE_URL}/sling_linux_amd64.tar.gz" | sha256sum | awk '{print $1}')
+          SHA_LINUX_ARM64=$(curl -sL "${BASE_URL}/sling_linux_arm64.tar.gz" | sha256sum | awk '{print $1}')
+
+          cat > Formula/sling.rb <<EOF
+          class Sling < Formula
+            desc "CLI tool for Slingboard"
+            homepage "https://github.com/laetho/sling"
+            version "${VERSION}"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "${BASE_URL}/sling_darwin_arm64.tar.gz"
+                sha256 "${SHA_DARWIN_ARM64}"
+              else
+                url "${BASE_URL}/sling_darwin_amd64.tar.gz"
+                sha256 "${SHA_DARWIN_AMD64}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "${BASE_URL}/sling_linux_arm64.tar.gz"
+                sha256 "${SHA_LINUX_ARM64}"
+              else
+                url "${BASE_URL}/sling_linux_amd64.tar.gz"
+                sha256 "${SHA_LINUX_AMD64}"
+              end
+            end
+
+            def install
+              bin.install "sling"
+            end
+
+            test do
+              system "#{bin}/sling", "--version"
+            end
+          end
+          EOF
+
+      - name: Commit changes
+        run: |
+          git add Formula/sling.rb
+          if git diff --cached --quiet; then
+            echo "No formula changes to commit."
+            exit 0
+          fi
+          git commit -m "Update Homebrew formula for ${GITHUB_REF_NAME}"
+
+      - name: Push changes
+        run: git push origin HEAD:master
