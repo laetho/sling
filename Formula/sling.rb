@@ -1,25 +1,25 @@
 class Sling < Formula
   desc "CLI tool for Slingboard"
   homepage "https://github.com/laetho/sling"
-  version "0.8.7"
+  version "0.8.8"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/laetho/sling/releases/download/v0.8.7/sling_darwin_arm64.tar.gz"
-      sha256 "a878527767faab7fe4b829f1364020e4b513af1e065667a8349e0e5f4da5ea4d"
+      url "https://github.com/laetho/sling/releases/download/v0.8.8/sling_darwin_arm64.tar.gz"
+      sha256 "7437f890d54ba3053c3a59cf483e3e029c283d483731f5a27b0699bbc7d866cf"
     else
-      url "https://github.com/laetho/sling/releases/download/v0.8.7/sling_darwin_amd64.tar.gz"
-      sha256 "c71c2e240f4d4db81a6ca990efa24b8f4b0525008ce7c8cf6161cba7001353ce"
+      url "https://github.com/laetho/sling/releases/download/v0.8.8/sling_darwin_amd64.tar.gz"
+      sha256 "d5789be7469c8a9730113979724b4756df389d85c9136608627fd084ea9ecc5d"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/laetho/sling/releases/download/v0.8.7/sling_linux_arm64.tar.gz"
-      sha256 "163e254fe216ac55a9c9410e000a08715a998da7b5cb6edcbcda92f37621e6e0"
+      url "https://github.com/laetho/sling/releases/download/v0.8.8/sling_linux_arm64.tar.gz"
+      sha256 "83594e3836b8c05bb772b89f2e383a2bef95a3f0c83f9c8c2ef331ad131e7fa6"
     else
-      url "https://github.com/laetho/sling/releases/download/v0.8.7/sling_linux_amd64.tar.gz"
-      sha256 "05b24515ee6170cd2727561f858c7d2d1ff38aa35683b4a87b1020549119b997"
+      url "https://github.com/laetho/sling/releases/download/v0.8.8/sling_linux_amd64.tar.gz"
+      sha256 "a9c314b6894ee61349efe41f60980b16324f05ed9c36e0ca160576bdab58ea5e"
     end
   end
 
